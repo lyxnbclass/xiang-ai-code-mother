@@ -18,10 +18,10 @@
 
 JSON 字段必须与下面完全一致：
 {
+  "description": "生成代码的简短说明",
   "htmlCode": "index.html 的完整代码字符串",
   "cssCode": "style.css 的完整代码字符串",
   "jsCode": "script.js 的完整代码字符串",
-  "description": "生成代码的简短说明"
 }
 
 特别注意：

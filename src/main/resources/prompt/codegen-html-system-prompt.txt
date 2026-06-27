@@ -17,8 +17,9 @@
 
 JSON 字段必须与下面完全一致：
 {
-  "htmlCode": "完整的 HTML 代码字符串",
-  "description": "生成代码的简短说明"
+  "description": "生成代码的简短说明",
+  "htmlCode": "完整的 HTML 代码字符串"
+
 }
 
 特别注意：
