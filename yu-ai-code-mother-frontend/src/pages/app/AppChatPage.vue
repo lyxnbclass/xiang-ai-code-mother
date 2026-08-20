@@ -213,6 +213,7 @@
 import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import axios from 'axios'
 import { useLoginUserStore } from '@/stores/loginUser'
 import {
   getAppVoById,
@@ -245,7 +246,7 @@ const loginUserStore = useLoginUserStore()
 
 // 应用信息
 const appInfo = ref<API.AppVO>()
-const appId = ref<any>()
+const appId = ref<string>()
 
 // 对话相关
 interface Message {
@@ -346,8 +347,15 @@ const loadChatHistory = async (isLoadMore = false) => {
       historyLoaded.value = true
     }
   } catch (error) {
-    console.error('加载对话历史失败：', error)
-    message.error('加载对话历史失败')
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      // 第 5 阶段尚未提供对话历史接口，按无历史记录继续生成流程。
+      console.info('对话历史接口尚未启用，按无历史模式继续')
+      hasMoreHistory.value = false
+      historyLoaded.value = true
+    } else {
+      console.error('加载对话历史失败：', error)
+      message.error('加载对话历史失败')
+    }
   } finally {
     loadingHistory.value = false
   }
@@ -370,7 +378,7 @@ const fetchAppInfo = async () => {
   appId.value = id
 
   try {
-    const res = await getAppVoById({ id: id as unknown as number })
+    const res = await getAppVoById({ id })
     if (res.data.code === 0 && res.data.data) {
       appInfo.value = res.data.data
 
@@ -656,7 +664,7 @@ const deployApp = async () => {
   deploying.value = true
   try {
     const res = await deployAppApi({
-      appId: appId.value as unknown as number,
+      appId: appId.value,
     })
 
     if (res.data.code === 0 && res.data.data) {

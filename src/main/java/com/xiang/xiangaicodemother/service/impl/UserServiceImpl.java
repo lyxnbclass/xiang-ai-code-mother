@@ -21,6 +21,7 @@ import org.springframework.util.DigestUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.xiang.xiangaicodemother.constant.UserConstant.USER_LOGIN_STATE;
@@ -32,6 +33,10 @@ import static com.xiang.xiangaicodemother.constant.UserConstant.USER_LOGIN_STATE
  */
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "userAccount", "userName", "userRole", "editTime", "createTime", "updateTime"
+    );
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -169,13 +174,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String userRole = userQueryRequest.getUserRole();
         String sortField = userQueryRequest.getSortField();
         String sortOrder = userQueryRequest.getSortOrder();
-        return QueryWrapper.create()
+        QueryWrapper queryWrapper = QueryWrapper.create()
                 .eq("id", id) // where id = ${id}
                 .eq("userRole", userRole) // and userRole = ${userRole}
                 .like("userAccount", userAccount)
                 .like("userName", userName)
-                .like("userProfile", userProfile)
-                .orderBy(sortField, "ascend".equals(sortOrder));
+                .like("userProfile", userProfile);
+        if (sortField != null && ALLOWED_SORT_FIELDS.contains(sortField)) {
+            queryWrapper.orderBy(sortField, "ascend".equals(sortOrder));
+        }
+        return queryWrapper;
     }
 
     @Override

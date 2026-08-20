@@ -127,8 +127,9 @@ public class UserController {
      */
     @GetMapping("/get/vo")
     public BaseResponse<UserVO> getUserVOById(long id) {
-        BaseResponse<User> response = getUserById(id);
-        User user = response.getData();
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+        User user = userService.getById(id);
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR);
         return ResultUtils.success(userService.getUserVO(user));
     }
 

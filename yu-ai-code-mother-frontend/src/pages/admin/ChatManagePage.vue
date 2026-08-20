@@ -173,14 +173,14 @@ const doSearch = () => {
 }
 
 // 查看应用对话
-const viewAppChat = (appId: number | undefined) => {
+const viewAppChat = (appId: string | undefined) => {
   if (appId) {
     router.push(`/app/chat/${appId}`)
   }
 }
 
 // 删除消息
-const deleteMessage = async (id: number | undefined) => {
+const deleteMessage = async (id: string | undefined) => {
   if (!id) return
 
   try {
