@@ -13,7 +13,7 @@
         >
           <a-select-option value="">全部</a-select-option>
           <a-select-option value="user">用户消息</a-select-option>
-          <a-select-option value="assistant">AI消息</a-select-option>
+          <a-select-option value="ai">AI消息</a-select-option>
         </a-select>
       </a-form-item>
       <a-form-item label="应用ID">
@@ -32,6 +32,7 @@
     <a-table
       :columns="columns"
       :data-source="data"
+      :row-key="rowKey"
       :pagination="pagination"
       @change="doTableChange"
       :scroll="{ x: 1400 }"
@@ -69,10 +70,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { listAllChatHistoryByPageForAdmin } from '@/api/chatHistoryController'
+import {
+  deleteChatHistoryByAdmin,
+  listAllChatHistoryByPageForAdmin,
+} from '@/api/chatHistoryController'
 import { formatTime } from '@/utils/time'
 
 const router = useRouter()
+
+const rowKey = (record: API.ChatHistory) => record.id ?? ''
 
 const columns = [
   {
@@ -184,11 +190,13 @@ const deleteMessage = async (id: string | undefined) => {
   if (!id) return
 
   try {
-    // 注意：这里需要后端提供删除对话历史的接口
-    // 目前先显示成功，实际实现需要调用删除接口
-    message.success('删除成功')
-    // 刷新数据
-    fetchData()
+    const res = await deleteChatHistoryByAdmin({ id })
+    if (res.data.code === 0 && res.data.data) {
+      message.success('删除成功')
+      await fetchData()
+    } else {
+      message.error('删除失败，' + res.data.message)
+    }
   } catch (error) {
     console.error('删除失败：', error)
     message.error('删除失败')

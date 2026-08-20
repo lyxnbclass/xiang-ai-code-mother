@@ -27,7 +27,12 @@
           </template>
           下载代码
         </a-button>
-        <a-button type="primary" @click="deployApp" :loading="deploying">
+        <a-button
+            type="primary"
+            @click="deployApp"
+            :loading="deploying"
+            :disabled="!isOwner"
+        >
           <template #icon>
             <CloudUploadOutlined />
           </template>
@@ -213,7 +218,6 @@
 import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import axios from 'axios'
 import { useLoginUserStore } from '@/stores/loginUser'
 import {
   getAppVoById,
@@ -347,15 +351,8 @@ const loadChatHistory = async (isLoadMore = false) => {
       historyLoaded.value = true
     }
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      // 第 5 阶段尚未提供对话历史接口，按无历史记录继续生成流程。
-      console.info('对话历史接口尚未启用，按无历史模式继续')
-      hasMoreHistory.value = false
-      historyLoaded.value = true
-    } else {
-      console.error('加载对话历史失败：', error)
-      message.error('加载对话历史失败')
-    }
+    console.error('加载对话历史失败：', error)
+    message.error('加载对话历史失败，请刷新后重试')
   } finally {
     loadingHistory.value = false
   }
@@ -382,10 +379,14 @@ const fetchAppInfo = async () => {
     if (res.data.code === 0 && res.data.data) {
       appInfo.value = res.data.data
 
-      // 先加载对话历史
-      await loadChatHistory()
-      // 如果有至少2条对话记录，展示对应的网站
-      if (messages.value.length >= 2) {
+      // 对话历史是私有数据，只有应用创建者和管理员可以读取。
+      if (isOwner.value || isAdmin.value) {
+        await loadChatHistory()
+      } else {
+        historyLoaded.value = true
+      }
+      // 有完整对话或当前是访客时，尝试展示已生成的网站。
+      if (messages.value.length >= 2 || !isOwner.value) {
         updatePreview()
       }
       // 检查是否需要自动发送初始提示词

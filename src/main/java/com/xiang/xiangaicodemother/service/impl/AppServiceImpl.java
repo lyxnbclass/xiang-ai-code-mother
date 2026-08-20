@@ -7,6 +7,7 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.xiang.xiangaicodemother.ai.AiCodeGeneratorServiceFactory;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
 import com.xiang.xiangaicodemother.exception.BusinessException;
@@ -16,16 +17,21 @@ import com.xiang.xiangaicodemother.mapper.AppMapper;
 import com.xiang.xiangaicodemother.model.dto.app.AppQueryRequest;
 import com.xiang.xiangaicodemother.model.entity.App;
 import com.xiang.xiangaicodemother.model.entity.User;
+import com.xiang.xiangaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import com.xiang.xiangaicodemother.model.vo.AppVO;
 import com.xiang.xiangaicodemother.model.vo.UserVO;
 import com.xiang.xiangaicodemother.service.AppService;
+import com.xiang.xiangaicodemother.service.ChatHistoryService;
 import com.xiang.xiangaicodemother.service.UserService;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,6 +44,7 @@ import java.util.stream.Collectors;
  * 应用服务实现。
  */
 @Service
+@Slf4j
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
@@ -50,6 +57,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+
+    @Resource
+    private ChatHistoryService chatHistoryService;
+
+    @Resource
+    private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
@@ -66,7 +79,39 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
         ThrowUtils.throwIf(codeGenType == null, ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+
+        boolean userMessageSaved = chatHistoryService.addChatMessage(
+                appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        ThrowUtils.throwIf(!userMessageSaved, ErrorCode.OPERATION_ERROR, "保存用户消息失败");
+
+        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+        StringBuilder aiResponseBuilder = new StringBuilder();
+        return contentFlux
+                .doOnNext(aiResponseBuilder::append)
+                .doOnComplete(() -> saveAiMessage(appId, aiResponseBuilder.toString(), loginUser.getId()))
+                .doOnError(error -> saveAiErrorMessage(appId, error, loginUser.getId()));
+    }
+
+    private void saveAiMessage(Long appId, String message, Long userId) {
+        if (StrUtil.isBlank(message)) {
+            log.warn("AI 返回空消息，appId={}", appId);
+            return;
+        }
+        boolean saved = chatHistoryService.addChatMessage(
+                appId, message, ChatHistoryMessageTypeEnum.AI.getValue(), userId);
+        if (!saved) {
+            log.error("保存 AI 消息失败，appId={}", appId);
+        }
+    }
+
+    private void saveAiErrorMessage(Long appId, Throwable error, Long userId) {
+        String detail = StrUtil.blankToDefault(error.getMessage(), "未知错误");
+        try {
+            chatHistoryService.addChatMessage(appId, "AI 回复失败：" + detail,
+                    ChatHistoryMessageTypeEnum.AI.getValue(), userId);
+        } catch (Exception persistenceError) {
+            log.error("保存 AI 错误消息失败，appId={}", appId, persistenceError);
+        }
     }
 
     @Override
@@ -177,5 +222,31 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             queryWrapper.orderBy(sortField, "ascend".equals(request.getSortOrder()));
         }
         return queryWrapper;
+    }
+
+    /**
+     * 删除应用时同步逻辑删除其对话历史；任一步失败都会回滚。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean removeById(Serializable id) {
+        if (id == null) {
+            return false;
+        }
+        long appId;
+        try {
+            appId = Long.parseLong(id.toString());
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        if (appId <= 0) {
+            return false;
+        }
+        chatHistoryService.deleteByAppId(appId);
+        boolean removed = super.removeById(id);
+        if (removed) {
+            aiCodeGeneratorServiceFactory.clearAppChatMemory(appId);
+        }
+        return removed;
     }
 }

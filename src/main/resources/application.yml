@@ -1,25 +1,38 @@
 spring:
   application:
-      name: shawn-ai-code-mother-backend
+    name: shawn-ai-code-mother-backend
+  session:
+    store-type: redis
+    timeout: 30d
   # mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/xiang_ai_code_mother}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ttl: ${REDIS_CHAT_MEMORY_TTL:3600}
   profiles:
     active: local
 server:
   port: 8123
   servlet:
-      context-path: /api
+    context-path: /api
+    session:
+      cookie:
+        max-age: 30d
+        http-only: true
 # springdoc-openapi
 springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
       packages-to-scan: com.xiang.xiangaicodemother.controller
-# knife4j???????????????
+# Knife4j 接口文档
 knife4j:
   enable: true
   setting:
