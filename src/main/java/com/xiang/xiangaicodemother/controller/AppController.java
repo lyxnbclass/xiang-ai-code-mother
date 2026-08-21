@@ -111,7 +111,7 @@ public class AppController {
         App app = new App();
         app.setInitPrompt(initPrompt);
         app.setAppName(StrUtil.sub(initPrompt, 0, 12));
-        app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
+        app.setCodeGenType(CodeGenTypeEnum.VUE_PROJECT.getValue());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
         app.setUserId(loginUser.getId());
         boolean saved = appService.save(app);

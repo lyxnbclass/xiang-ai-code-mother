@@ -37,12 +37,4 @@ class AiCodeGeneratorFacadeTest {
         Assertions.assertNotNull(completeContent);
     }
 
-    @Test
-    void generateVueProjectCodeStream() {
-        Assertions.assertThrows(RuntimeException.class, () ->
-                aiCodeGeneratorFacade.generateAndSaveCodeStream(
-                        "简单的任务记录网站，总代码量不超过 200 行",
-                        CodeGenTypeEnum.VUE_PROJECT,
-                        1L));
-    }
 }

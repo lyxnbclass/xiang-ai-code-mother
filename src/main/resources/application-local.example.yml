@@ -18,3 +18,7 @@ langchain4j:
       max-tokens: 8192
       log-requests: true
       log-responses: true
+
+# Vue 工程工具调用模型可单独覆盖；默认复用兼容工具调用的 deepseek-chat。
+# VUE_REASONING_MODEL_NAME=deepseek-chat
+# VUE_REASONING_MAX_TOKENS=8192
