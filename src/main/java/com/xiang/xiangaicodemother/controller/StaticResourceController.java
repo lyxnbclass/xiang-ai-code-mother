@@ -60,7 +60,17 @@ public class StaticResourceController {
         if (!directoryRoot.startsWith(PREVIEW_ROOT) || !file.startsWith(directoryRoot)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        if (!Files.isRegularFile(file)) {
+        try {
+            Path realPreviewRoot = PREVIEW_ROOT.toRealPath();
+            Path realDirectoryRoot = directoryRoot.toRealPath();
+            Path realFile = file.toRealPath();
+            if (!realDirectoryRoot.startsWith(realPreviewRoot)
+                    || !realFile.startsWith(realDirectoryRoot)
+                    || !Files.isRegularFile(realFile)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            file = realFile;
+        } catch (IOException e) {
             return ResponseEntity.notFound().build();
         }
 

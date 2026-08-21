@@ -10,6 +10,8 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xiang.xiangaicodemother.ai.AiCodeGeneratorServiceFactory;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
+import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
+import com.xiang.xiangaicodemother.core.handler.StreamHandlerExecutor;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.exception.ThrowUtils;
@@ -64,6 +66,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
+
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
@@ -85,33 +93,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(!userMessageSaved, ErrorCode.OPERATION_ERROR, "保存用户消息失败");
 
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        return contentFlux
-                .doOnNext(aiResponseBuilder::append)
-                .doOnComplete(() -> saveAiMessage(appId, aiResponseBuilder.toString(), loginUser.getId()))
-                .doOnError(error -> saveAiErrorMessage(appId, error, loginUser.getId()));
-    }
-
-    private void saveAiMessage(Long appId, String message, Long userId) {
-        if (StrUtil.isBlank(message)) {
-            log.warn("AI 返回空消息，appId={}", appId);
-            return;
-        }
-        boolean saved = chatHistoryService.addChatMessage(
-                appId, message, ChatHistoryMessageTypeEnum.AI.getValue(), userId);
-        if (!saved) {
-            log.error("保存 AI 消息失败，appId={}", appId);
-        }
-    }
-
-    private void saveAiErrorMessage(Long appId, Throwable error, Long userId) {
-        String detail = StrUtil.blankToDefault(error.getMessage(), "未知错误");
-        try {
-            chatHistoryService.addChatMessage(appId, "AI 回复失败：" + detail,
-                    ChatHistoryMessageTypeEnum.AI.getValue(), userId);
-        } catch (Exception persistenceError) {
-            log.error("保存 AI 错误消息失败，appId={}", appId, persistenceError);
-        }
+        return streamHandlerExecutor.doExecute(
+                contentFlux, chatHistoryService, appId, loginUser, codeGenType);
     }
 
     @Override
@@ -131,14 +114,28 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             deployKey = generateUniqueDeployKey();
         }
 
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
         String sourceDirName = app.getCodeGenType() + "_" + appId;
         File sourceDir = new File(AppConstant.CODE_OUTPUT_ROOT_DIR, sourceDirName);
         if (!sourceDir.isDirectory()) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "应用代码不存在，请先生成应用");
         }
 
+        if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+            boolean built = vueProjectBuilder.buildProject(sourceDir.getAbsolutePath());
+            ThrowUtils.throwIf(!built, ErrorCode.OPERATION_ERROR, "Vue 项目构建失败，请检查生成代码");
+            File distDir = new File(sourceDir, "dist");
+            ThrowUtils.throwIf(!new File(distDir, "index.html").isFile(),
+                    ErrorCode.OPERATION_ERROR, "Vue 项目未生成 dist/index.html");
+            sourceDir = distDir;
+        }
+
         File deployDir = new File(AppConstant.CODE_DEPLOY_ROOT_DIR, deployKey);
         try {
+            if (deployDir.exists()) {
+                FileUtil.del(deployDir);
+            }
             FileUtil.copyContent(sourceDir, deployDir, true);
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用部署失败");

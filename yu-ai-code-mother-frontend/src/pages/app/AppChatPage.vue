@@ -177,13 +177,13 @@
           </div>
         </div>
         <div class="preview-content">
-          <div v-if="!previewUrl && !isGenerating" class="preview-placeholder">
+          <div v-if="!previewUrl && !isGenerating && !isPreviewBuilding" class="preview-placeholder">
             <div class="placeholder-icon">🌐</div>
             <p>网站文件生成完成后将在这里展示</p>
           </div>
-          <div v-else-if="isGenerating" class="preview-loading">
+          <div v-else-if="isGenerating || isPreviewBuilding" class="preview-loading">
             <a-spin size="large" />
-            <p>正在生成网站...</p>
+            <p>{{ isGenerating ? '正在生成网站...' : '正在构建 Vue 项目...' }}</p>
           </div>
           <iframe
               v-else
@@ -274,6 +274,7 @@ const historyLoaded = ref(false)
 // 预览相关
 const previewUrl = ref('')
 const previewReady = ref(false)
+const isPreviewBuilding = ref(false)
 
 // 部署相关
 const deploying = ref(false)
@@ -538,11 +539,8 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       isGenerating.value = false
       eventSource?.close()
 
-      // 延迟更新预览，确保后端已完成处理
-      setTimeout(async () => {
-        await fetchAppInfo()
-        updatePreview()
-      }, 1000)
+      // Vue 工程会在流结束后异步构建，轮询到 dist 可访问后再刷新 iframe。
+      void refreshPreviewWhenReady()
     })
 
     // 处理business-error事件（后端限流等错误）
@@ -577,10 +575,7 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
         isGenerating.value = false
         eventSource?.close()
 
-        setTimeout(async () => {
-          await fetchAppInfo()
-          updatePreview()
-        }, 1000)
+        void refreshPreviewWhenReady()
       } else {
         handleError(new Error('SSE连接错误'), aiMessageIndex)
       }
@@ -601,13 +596,48 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
 }
 
 // 更新预览
-const updatePreview = () => {
+const updatePreview = (cacheBust = false) => {
   if (appId.value) {
     const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
     const newPreviewUrl = getStaticPreviewUrl(codeGenType, appId.value)
-    previewUrl.value = newPreviewUrl
-    previewReady.value = true
+    previewUrl.value = cacheBust ? `${newPreviewUrl}?t=${Date.now()}` : newPreviewUrl
+    previewReady.value = false
   }
+}
+
+const refreshPreviewWhenReady = async () => {
+  await fetchAppInfo()
+  if (!appId.value) return
+
+  const codeGenType = appInfo.value?.codeGenType || CodeGenTypeEnum.HTML
+  const targetUrl = getStaticPreviewUrl(codeGenType, appId.value)
+  if (codeGenType !== CodeGenTypeEnum.VUE_PROJECT) {
+    isPreviewBuilding.value = false
+    updatePreview(true)
+    return
+  }
+
+  previewReady.value = false
+  isPreviewBuilding.value = true
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    try {
+      const response = await fetch(`${targetUrl}?check=${Date.now()}`, {
+        method: 'HEAD',
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (response.ok) {
+        isPreviewBuilding.value = false
+        updatePreview(true)
+        return
+      }
+    } catch {
+      // 构建期间资源暂不可用，继续等待。
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+  }
+  isPreviewBuilding.value = false
+  message.warning('Vue 项目构建时间较长，请稍后刷新预览')
 }
 
 // 滚动到底部

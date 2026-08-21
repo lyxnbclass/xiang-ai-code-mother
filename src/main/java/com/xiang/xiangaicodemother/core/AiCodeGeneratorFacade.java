@@ -3,13 +3,19 @@ package com.xiang.xiangaicodemother.core;
 
 import com.xiang.xiangaicodemother.ai.AiCodeGeneratorService;
 import com.xiang.xiangaicodemother.ai.AiCodeGeneratorServiceFactory;
+import com.xiang.xiangaicodemother.ai.VueCodeGeneratorService;
 import com.xiang.xiangaicodemother.ai.model.HtmlCodeResult;
 import com.xiang.xiangaicodemother.ai.model.MultiFileCodeResult;
+import com.xiang.xiangaicodemother.ai.model.message.AiResponseMessage;
+import com.xiang.xiangaicodemother.ai.model.message.ToolExecutedMessage;
+import com.xiang.xiangaicodemother.ai.model.message.ToolRequestMessage;
 import com.xiang.xiangaicodemother.core.parser.CodeParserExecutor;
 import com.xiang.xiangaicodemother.core.saver.CodeFileSaverExecutor;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
+import cn.hutool.json.JSONUtil;
+import dev.langchain4j.service.TokenStream;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,14 +41,16 @@ public class AiCodeGeneratorFacade {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型不能为空");
         }
         validateAppId(appId);
-        AiCodeGeneratorService aiCodeGeneratorService =
-                aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codeGenTypeEnum){
             case HTML -> {
+                AiCodeGeneratorService aiCodeGeneratorService =
+                        aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
                 HtmlCodeResult result=aiCodeGeneratorService.generateHtmlCode(userMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
+                AiCodeGeneratorService aiCodeGeneratorService =
+                        aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
                 MultiFileCodeResult result=aiCodeGeneratorService.generateMultiFileCode(userMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE, appId);
             }
@@ -66,22 +74,49 @@ public class AiCodeGeneratorFacade {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "生成类型为空");
         }
         validateAppId(appId);
-        AiCodeGeneratorService aiCodeGeneratorService =
-                aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
         return switch (codeGenTypeEnum) {
             case HTML -> {
+                AiCodeGeneratorService aiCodeGeneratorService =
+                        aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
                 Flux<String> codeStream = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
+                AiCodeGeneratorService aiCodeGeneratorService =
+                        aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
                 Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
+            }
+            case VUE_PROJECT -> {
+                VueCodeGeneratorService vueService =
+                        aiCodeGeneratorServiceFactory.getVueCodeGeneratorService(appId);
+                TokenStream tokenStream = vueService.generateVueProjectCodeStream(appId, userMessage);
+                yield processTokenStream(tokenStream);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
             }
         };
+    }
+
+    /**
+     * 1.1.0 的 TokenStream 只能在工具执行完成后回调，因此在同一时刻补发“选择工具”和
+     * “工具完成”两种结构化事件。这样无需覆盖依赖源码，也能保证前端与历史消息一致。
+     */
+    Flux<String> processTokenStream(TokenStream tokenStream) {
+        return Flux.create(sink -> tokenStream
+                .onPartialResponse(partial -> sink.next(JSONUtil.toJsonStr(new AiResponseMessage(partial))))
+                .onToolExecuted(execution -> {
+                    sink.next(JSONUtil.toJsonStr(new ToolRequestMessage(execution.request())));
+                    sink.next(JSONUtil.toJsonStr(new ToolExecutedMessage(execution)));
+                })
+                .onCompleteResponse(response -> sink.complete())
+                .onError(error -> {
+                    log.error("Vue 工程生成失败", error);
+                    sink.error(error);
+                })
+                .start());
     }
 
 
