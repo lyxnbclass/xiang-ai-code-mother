@@ -661,19 +661,29 @@ const downloadCode = async () => {
       method: 'GET',
       credentials: 'include',
     })
-    if (!response.ok) {
-      throw new Error(`下载失败: ${response.status}`)
+    const contentType = response.headers.get('Content-Type') || ''
+    if (!response.ok || contentType.includes('application/json')) {
+      const errorBody = contentType.includes('application/json')
+        ? await response.json().catch(() => null)
+        : null
+      throw new Error(errorBody?.message || `下载失败: ${response.status}`)
     }
     // 获取文件名
-    const contentDisposition = response.headers.get('Content-Disposition')
-    const fileName = contentDisposition?.match(/filename="(.+)"/)?.[1] || `app-${appId.value}.zip`
+    const contentDisposition = response.headers.get('Content-Disposition') || ''
+    const encodedName = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    const plainName = contentDisposition.match(/filename="?([^";]+)"?/i)?.[1]
+    const fileName = encodedName
+      ? decodeURIComponent(encodedName)
+      : plainName || `app-${appId.value}.zip`
     // 下载文件
     const blob = await response.blob()
     const downloadUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl
     link.download = fileName
+    document.body.appendChild(link)
     link.click()
+    link.remove()
     // 清理
     URL.revokeObjectURL(downloadUrl)
     message.success('代码下载成功')

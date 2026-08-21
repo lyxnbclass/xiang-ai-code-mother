@@ -22,3 +22,15 @@ langchain4j:
 # Vue 工程工具调用模型可单独覆盖；默认复用兼容工具调用的 deepseek-chat。
 # VUE_REASONING_MODEL_NAME=deepseek-chat
 # VUE_REASONING_MAX_TOKENS=8192
+
+# 可选：部署后自动生成封面。建议通过环境变量配置，避免提交密钥。
+# COS_ENABLED=true
+# COS_HOST=https://your-custom-domain.example.com
+# COS_SECRET_ID=your-secret-id
+# COS_SECRET_KEY=your-secret-key
+# COS_REGION=ap-shanghai
+# COS_BUCKET=your-bucket-name
+# CHROME_DRIVER_PATH=/absolute/path/to/chromedriver
+# CHROME_BINARY_PATH=/absolute/path/to/chrome
+# APP_DEPLOY_HOST=https://your-deploy-domain.example.com
+# Docker 环境若 Chrome 沙箱不可用，可设置 SCREENSHOT_NO_SANDBOX=true。
