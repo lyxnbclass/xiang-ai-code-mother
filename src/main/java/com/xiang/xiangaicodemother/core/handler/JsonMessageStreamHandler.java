@@ -1,6 +1,5 @@
 package com.xiang.xiangaicodemother.core.handler;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
@@ -9,6 +8,8 @@ import com.xiang.xiangaicodemother.ai.model.message.StreamMessage;
 import com.xiang.xiangaicodemother.ai.model.message.StreamMessageTypeEnum;
 import com.xiang.xiangaicodemother.ai.model.message.ToolExecutedMessage;
 import com.xiang.xiangaicodemother.ai.model.message.ToolRequestMessage;
+import com.xiang.xiangaicodemother.ai.tools.BaseTool;
+import com.xiang.xiangaicodemother.ai.tools.ToolManager;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
 import com.xiang.xiangaicodemother.model.entity.User;
@@ -29,6 +30,16 @@ public class JsonMessageStreamHandler {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ToolManager toolManager;
+
+    public JsonMessageStreamHandler() {
+    }
+
+    JsonMessageStreamHandler(ToolManager toolManager) {
+        this.toolManager = toolManager;
+    }
 
     public Flux<String> handle(Flux<String> originFlux, ChatHistoryService chatHistoryService,
                                long appId, User loginUser) {
@@ -82,19 +93,31 @@ public class JsonMessageStreamHandler {
         ToolRequestMessage request = JSONUtil.toBean(chunk, ToolRequestMessage.class);
         String id = request.getId();
         if (id != null && seenToolIds.add(id)) {
-            return "\n\n[选择工具] 写入文件\n\n";
+            BaseTool tool = toolManager.getTool(request.getName());
+            if (tool == null) {
+                log.warn("AI 请求了未注册工具: {}", request.getName());
+                return String.format("\n\n[选择工具] 未知工具 %s\n\n",
+                        StrUtil.blankToDefault(request.getName(), "unknown"));
+            }
+            return tool.generateToolRequestResponse();
         }
         return "";
     }
 
     private String handleToolExecuted(String chunk, StringBuilder history) {
         ToolExecutedMessage executed = JSONUtil.toBean(chunk, ToolExecutedMessage.class);
-        JSONObject arguments = JSONUtil.parseObj(executed.getArguments());
-        String relativePath = StrUtil.blankToDefault(arguments.getStr("relativeFilePath"), "unknown.txt");
-        String content = StrUtil.blankToDefault(arguments.getStr("content"), "");
-        String suffix = StrUtil.blankToDefault(FileUtil.getSuffix(relativePath), "text");
-        String output = String.format("\n\n[工具调用] 写入文件 %s\n````%s\n%s\n````\n\n",
-                relativePath, suffix, content);
+        BaseTool tool = toolManager.getTool(executed.getName());
+        if (tool == null) {
+            log.warn("AI 执行了未注册工具: {}", executed.getName());
+            return "";
+        }
+        JSONObject arguments = JSONUtil.parseObj(
+                StrUtil.blankToDefault(executed.getArguments(), "{}"));
+        String result = tool.generateToolExecutedResult(arguments);
+        if (StrUtil.isBlank(result)) {
+            return "";
+        }
+        String output = String.format("\n\n%s\n\n", result);
         history.append(output);
         return output;
     }

@@ -118,16 +118,33 @@ export class VisualEditor {
    * 处理来自 iframe 的消息
    */
   handleIframeMessage(event: MessageEvent) {
-    const { type, data } = event.data
+    const iframeWindow = this.iframe?.contentWindow
+    const iframeOrigin = this.getIframeOrigin()
+    if (!iframeWindow || !iframeOrigin || event.source !== iframeWindow || event.origin !== iframeOrigin) {
+      return
+    }
+    if (!event.data || typeof event.data !== 'object') {
+      return
+    }
+    const { type, data } = event.data as {
+      type?: string
+      data?: { elementInfo?: unknown }
+    }
     switch (type) {
       case 'ELEMENT_SELECTED':
-        if (this.options.onElementSelected && data.elementInfo) {
-          this.options.onElementSelected(data.elementInfo)
+        if (this.options.onElementSelected && data?.elementInfo) {
+          const elementInfo = this.normalizeElementInfo(data.elementInfo)
+          if (elementInfo) {
+            this.options.onElementSelected(elementInfo)
+          }
         }
         break
       case 'ELEMENT_HOVER':
-        if (this.options.onElementHover && data.elementInfo) {
-          this.options.onElementHover(data.elementInfo)
+        if (this.options.onElementHover && data?.elementInfo) {
+          const elementInfo = this.normalizeElementInfo(data.elementInfo)
+          if (elementInfo) {
+            this.options.onElementHover(elementInfo)
+          }
         }
         break
     }
@@ -137,8 +154,9 @@ export class VisualEditor {
    * 向 iframe 发送消息
    */
   private sendMessageToIframe(message: Record<string, any>) {
-    if (this.iframe?.contentWindow) {
-      this.iframe.contentWindow.postMessage(message, '*')
+    const iframeOrigin = this.getIframeOrigin()
+    if (this.iframe?.contentWindow && iframeOrigin) {
+      this.iframe.contentWindow.postMessage(message, iframeOrigin)
     }
   }
 
@@ -180,8 +198,10 @@ export class VisualEditor {
    * 生成编辑脚本内容
    */
   private generateEditScript() {
+    const parentOrigin = JSON.stringify(window.location.origin)
     return `
       (function() {
+        const parentOrigin = ${parentOrigin};
         let isEditMode = true;
         let currentHoverElement = null;
         let currentSelectedElement = null;
@@ -241,8 +261,11 @@ export class VisualEditor {
               path.unshift(selector);
               break;
             }
-            if (current.className) {
-              const classes = current.className.split(' ').filter(c => c && !c.startsWith('edit-'));
+            const className = typeof current.className === 'string'
+              ? current.className
+              : (current.className && current.className.baseVal) || '';
+            if (className) {
+              const classes = className.split(' ').filter(c => c && !c.startsWith('edit-'));
               if (classes.length > 0) {
                 selector += '.' + classes.join('.');
               }
@@ -269,7 +292,9 @@ export class VisualEditor {
           return {
             tagName: element.tagName,
             id: element.id,
-            className: element.className,
+            className: typeof element.className === 'string'
+              ? element.className
+              : (element.className && element.className.baseVal) || '',
             textContent: element.textContent?.trim().substring(0, 100) || '',
             selector: generateSelector(element),
             pagePath: pagePath,
@@ -345,7 +370,7 @@ export class VisualEditor {
                window.parent.postMessage({
                  type: 'ELEMENT_SELECTED',
                  data: { elementInfo }
-               }, '*');
+               }, parentOrigin);
              } catch {
                // 静默处理发送失败
              }
@@ -363,6 +388,8 @@ export class VisualEditor {
 
         // 监听父窗口消息
         window.addEventListener('message', (event) => {
+           if (event.source !== window.parent || event.origin !== parentOrigin) return;
+           if (!event.data || typeof event.data !== 'object') return;
            const { type, editMode } = event.data;
            switch (type) {
              case 'TOGGLE_EDIT_MODE':
@@ -393,7 +420,7 @@ export class VisualEditor {
            if (document.getElementById('edit-tip')) return;
            const tip = document.createElement('div');
            tip.id = 'edit-tip';
-           tip.innerHTML = '🎯 编辑模式已开启<br/>悬浮查看元素，点击选中元素';
+           tip.textContent = '🎯 编辑模式已开启\n悬浮查看元素，点击选中元素';
            tip.style.cssText = \`
              position: fixed;
              top: 20px;
@@ -406,6 +433,7 @@ export class VisualEditor {
              z-index: 9999;
              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
              animation: fadeIn 0.3s ease;
+             white-space: pre-line;
            \`;
            const style = document.createElement('style');
            style.textContent = '@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }';
@@ -423,5 +451,46 @@ export class VisualEditor {
          showEditTip();
       })();
     `
+  }
+
+  private getIframeOrigin(): string | null {
+    if (!this.iframe?.src) {
+      return null
+    }
+    try {
+      const origin = new URL(this.iframe.src, window.location.href).origin
+      return origin === window.location.origin ? origin : null
+    } catch {
+      return null
+    }
+  }
+
+  private normalizeElementInfo(value: unknown): ElementInfo | null {
+    if (!value || typeof value !== 'object') {
+      return null
+    }
+    const candidate = value as Partial<ElementInfo>
+    if (typeof candidate.tagName !== 'string' || typeof candidate.selector !== 'string') {
+      return null
+    }
+    const rect = candidate.rect && typeof candidate.rect === 'object' ? candidate.rect : undefined
+    const finiteNumber = (number: unknown) =>
+      typeof number === 'number' && Number.isFinite(number) ? number : 0
+    const limitedString = (text: unknown, maxLength: number) =>
+      typeof text === 'string' ? text.substring(0, maxLength) : ''
+    return {
+      tagName: limitedString(candidate.tagName, 50),
+      id: limitedString(candidate.id, 200),
+      className: limitedString(candidate.className, 500),
+      textContent: limitedString(candidate.textContent, 500),
+      selector: limitedString(candidate.selector, 1_000),
+      pagePath: limitedString(candidate.pagePath, 1_000),
+      rect: {
+        top: finiteNumber(rect?.top),
+        left: finiteNumber(rect?.left),
+        width: finiteNumber(rect?.width),
+        height: finiteNumber(rect?.height),
+      },
+    }
   }
 }

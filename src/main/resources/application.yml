@@ -37,4 +37,27 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+
+# 部署后封面截图。COS 未启用时会自动跳过，不影响应用部署。
+screenshot:
+  enabled: ${SCREENSHOT_ENABLED:true}
+  width: ${SCREENSHOT_WIDTH:1600}
+  height: ${SCREENSHOT_HEIGHT:900}
+  page-load-timeout-seconds: ${SCREENSHOT_PAGE_LOAD_TIMEOUT:30}
+  ready-timeout-seconds: ${SCREENSHOT_READY_TIMEOUT:10}
+  render-delay-millis: ${SCREENSHOT_RENDER_DELAY:2000}
+  max-concurrency: ${SCREENSHOT_MAX_CONCURRENCY:2}
+  no-sandbox: ${SCREENSHOT_NO_SANDBOX:false}
+  driver-path: ${CHROME_DRIVER_PATH:}
+  browser-path: ${CHROME_BINARY_PATH:}
+
+# 腾讯云 COS。密钥只通过环境变量或不入库的 application-local.yml 提供。
+cos:
+  client:
+    enabled: ${COS_ENABLED:false}
+    host: ${COS_HOST:}
+    secret-id: ${COS_SECRET_ID:}
+    secret-key: ${COS_SECRET_KEY:}
+    region: ${COS_REGION:}
+    bucket: ${COS_BUCKET:}
 # http://localhost:8123/api/doc.html#/home

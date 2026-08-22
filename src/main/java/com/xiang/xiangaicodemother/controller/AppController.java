@@ -21,17 +21,19 @@ import com.xiang.xiangaicodemother.model.dto.app.AppQueryRequest;
 import com.xiang.xiangaicodemother.model.dto.app.AppUpdateRequest;
 import com.xiang.xiangaicodemother.model.entity.App;
 import com.xiang.xiangaicodemother.model.entity.User;
-import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import com.xiang.xiangaicodemother.model.vo.AppVO;
 import com.xiang.xiangaicodemother.service.AppService;
+import com.xiang.xiangaicodemother.service.ProjectDownloadService;
 import com.xiang.xiangaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,6 +42,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +59,9 @@ public class AppController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private ProjectDownloadService projectDownloadService;
 
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
@@ -98,25 +104,25 @@ public class AppController {
         return ResultUtils.success(appService.deployApp(requestBody.getAppId(), loginUser));
     }
 
+    @GetMapping("/download/{appId}")
+    public void downloadAppCode(@PathVariable Long appId,
+                                HttpServletRequest request,
+                                HttpServletResponse response) {
+        validateId(appId);
+        App app = getExistingApp(appId);
+        User loginUser = userService.getLoginUser(request);
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限下载该应用代码");
+        }
+        Path sourceDir = Path.of(AppConstant.CODE_OUTPUT_ROOT_DIR, app.getCodeGenType() + "_" + appId);
+        projectDownloadService.downloadProjectAsZip(sourceDir, "app-" + appId + ".zip", response);
+    }
+
     @PostMapping("/add")
     public BaseResponse<Long> addApp(@RequestBody AppAddRequest requestBody,
                                      HttpServletRequest request) {
-        ThrowUtils.throwIf(requestBody == null || StrUtil.isBlank(requestBody.getInitPrompt()),
-                ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
-        ThrowUtils.throwIf(requestBody.getInitPrompt().length() > 1000,
-                ErrorCode.PARAMS_ERROR, "初始化 prompt 不能超过 1000 字");
         User loginUser = userService.getLoginUser(request);
-        String initPrompt = requestBody.getInitPrompt().trim();
-
-        App app = new App();
-        app.setInitPrompt(initPrompt);
-        app.setAppName(StrUtil.sub(initPrompt, 0, 12));
-        app.setCodeGenType(CodeGenTypeEnum.VUE_PROJECT.getValue());
-        app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
-        app.setUserId(loginUser.getId());
-        boolean saved = appService.save(app);
-        ThrowUtils.throwIf(!saved, ErrorCode.OPERATION_ERROR, "创建应用失败");
-        return ResultUtils.success(app.getId());
+        return ResultUtils.success(appService.createApp(requestBody, loginUser));
     }
 
     @PostMapping("/update")

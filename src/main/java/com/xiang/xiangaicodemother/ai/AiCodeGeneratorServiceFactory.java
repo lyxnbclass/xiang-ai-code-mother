@@ -2,7 +2,7 @@ package com.xiang.xiangaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.xiang.xiangaicodemother.ai.tools.FileWriteTool;
+import com.xiang.xiangaicodemother.ai.tools.ToolManager;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
@@ -46,7 +46,7 @@ public class AiCodeGeneratorServiceFactory {
     private ChatHistoryService chatHistoryService;
 
     @Resource
-    private FileWriteTool fileWriteTool;
+    private ToolManager toolManager;
 
     private final Cache<String, AiCodeGeneratorService> serviceCache = Caffeine.newBuilder()
             .maximumSize(1000)
@@ -134,7 +134,7 @@ public class AiCodeGeneratorServiceFactory {
         return AiServices.builder(VueCodeGeneratorService.class)
                 .streamingChatModel(reasoningStreamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
-                .tools(fileWriteTool)
+                .tools((Object[]) toolManager.getAllTools())
                 .hallucinatedToolNameStrategy(request -> ToolExecutionResultMessage.from(
                         request, "Error: there is no tool called " + request.name()))
                 .build();
