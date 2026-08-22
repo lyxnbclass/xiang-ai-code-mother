@@ -802,19 +802,22 @@ const getInputPlaceholder = () => {
   return '请描述你想生成的网站，越详细效果越好哦'
 }
 
+const handleVisualEditorMessage = (event: MessageEvent) => {
+  visualEditor.handleIframeMessage(event)
+}
+
 // 页面加载时获取应用信息
 onMounted(() => {
   fetchAppInfo()
 
   // 监听 iframe 消息
-  window.addEventListener('message', (event) => {
-    visualEditor.handleIframeMessage(event)
-  })
+  window.addEventListener('message', handleVisualEditorMessage)
 })
 
 // 清理资源
 onUnmounted(() => {
-  // EventSource 会在组件卸载时自动清理
+  window.removeEventListener('message', handleVisualEditorMessage)
+  visualEditor.disableEditMode()
 })
 </script>
 
