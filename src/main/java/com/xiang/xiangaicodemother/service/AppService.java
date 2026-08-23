@@ -17,6 +17,9 @@ public interface AppService extends IService<App> {
 
     Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 
+    /** @param agent 是否启用图片增强、质量检查和构建编排工作流 */
+    Flux<String> chatToGenCode(Long appId, String message, User loginUser, boolean agent);
+
     String deployApp(Long appId, User loginUser);
 
     AppVO getAppVO(App app);

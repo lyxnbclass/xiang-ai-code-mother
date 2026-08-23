@@ -14,6 +14,7 @@ import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
 import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
 import com.xiang.xiangaicodemother.core.handler.StreamHandlerExecutor;
+import com.xiang.xiangaicodemother.core.handler.SimpleTextStreamHandler;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.exception.ThrowUtils;
@@ -30,6 +31,7 @@ import com.xiang.xiangaicodemother.service.AppService;
 import com.xiang.xiangaicodemother.service.AppCoverService;
 import com.xiang.xiangaicodemother.service.ChatHistoryService;
 import com.xiang.xiangaicodemother.service.UserService;
+import com.xiang.xiangaicodemother.workflow.CodeGenWorkflow;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -78,6 +80,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
+    @Resource
+    private CodeGenWorkflow codeGenWorkflow;
 
     @Resource
     private AppCoverService appCoverService;
@@ -134,6 +139,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
+        return chatToGenCode(appId, message, loginUser, false);
+    }
+
+    @Override
+    public Flux<String> chatToGenCode(Long appId, String message, User loginUser, boolean agent) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
@@ -152,7 +162,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         ThrowUtils.throwIf(!userMessageSaved, ErrorCode.OPERATION_ERROR, "保存用户消息失败");
 
-        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+        Flux<String> contentFlux = agent
+                ? codeGenWorkflow.executeWithFlux(message, appId, codeGenType)
+                : aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+        if (agent) {
+            // 工作流返回面向用户的进度文本，且已在流程内完成 Vue 构建。
+            return new SimpleTextStreamHandler().handle(
+                    contentFlux, chatHistoryService, appId, loginUser);
+        }
         return streamHandlerExecutor.doExecute(
                 contentFlux, chatHistoryService, appId, loginUser, codeGenType);
     }

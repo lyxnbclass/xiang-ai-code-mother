@@ -34,3 +34,10 @@ langchain4j:
 # CHROME_BINARY_PATH=/absolute/path/to/chrome
 # APP_DEPLOY_HOST=https://your-deploy-domain.example.com
 # Docker 环境若 Chrome 沙箱不可用，可设置 SCREENSHOT_NO_SANDBOX=true。
+
+# 可选：Agent 工作流图片素材能力。缺失配置时会自动跳过对应图片类型。
+# PEXELS_API_KEY=your-pexels-api-key
+# DASHSCOPE_API_KEY=your-dashscope-api-key
+# DASHSCOPE_IMAGE_MODEL=wan2.2-t2i-flash
+# unDraw 的 Next.js buildId 会变化；抓取实际请求后再配置完整模板，保留两个 %s 占位符。
+# UNDRAW_URL_TEMPLATE=https://undraw.co/_next/data/<build-id>/search/%s.json?term=%s

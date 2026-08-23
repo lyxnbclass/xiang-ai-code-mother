@@ -66,13 +66,14 @@ public class AppController {
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,
+                                                       @RequestParam(defaultValue = "false") boolean agent,
                                                        HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
         ThrowUtils.throwIf(message.length() > 1000, ErrorCode.PARAMS_ERROR, "提示词不能超过 1000 字");
         User loginUser = userService.getLoginUser(request);
 
-        Flux<ServerSentEvent<String>> content = appService.chatToGenCode(appId, message, loginUser)
+        Flux<ServerSentEvent<String>> content = appService.chatToGenCode(appId, message, loginUser, agent)
                 .map(chunk -> ServerSentEvent.<String>builder()
                         .data(JSONUtil.toJsonStr(Map.of("d", chunk)))
                         .build());
