@@ -60,4 +60,14 @@ cos:
     secret-key: ${COS_SECRET_KEY:}
     region: ${COS_REGION:}
     bucket: ${COS_BUCKET:}
+
+# AI 工作流图片素材能力。未配置密钥时自动跳过对应能力，不影响代码生成。
+workflow:
+  max-quality-retries: ${WORKFLOW_MAX_QUALITY_RETRIES:1}
+  images:
+    pexels-api-key: ${PEXELS_API_KEY:}
+    undraw-url-template: ${UNDRAW_URL_TEMPLATE:}
+    dashscope-api-key: ${DASHSCOPE_API_KEY:}
+    dashscope-model: ${DASHSCOPE_IMAGE_MODEL:wan2.2-t2i-flash}
+    max-results-per-task: ${WORKFLOW_IMAGE_MAX_RESULTS:6}
 # http://localhost:8123/api/doc.html#/home

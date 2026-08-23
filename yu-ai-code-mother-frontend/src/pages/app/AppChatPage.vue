@@ -136,6 +136,14 @@
                 :disabled="isGenerating"
             />
             <div class="input-actions">
+              <a-tooltip title="启用图片素材增强、质量检查和自动构建">
+                <a-switch
+                    v-model:checked="agentMode"
+                    checked-children="工作流"
+                    un-checked-children="普通"
+                    :disabled="isGenerating || !isOwner"
+                />
+              </a-tooltip>
               <a-button
                   type="primary"
                   @click="sendMessage"
@@ -263,6 +271,7 @@ interface Message {
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
+const agentMode = ref(false)
 const messagesContainer = ref<HTMLElement>()
 
 // 对话历史相关
@@ -498,6 +507,7 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
     const params = new URLSearchParams({
       appId: appId.value || '',
       message: userMessage,
+      agent: String(agentMode.value),
     })
 
     const url = `${baseURL}/app/chat/gen/code?${params}`
@@ -953,13 +963,16 @@ onUnmounted(() => {
 }
 
 .input-wrapper .ant-input {
-  padding-right: 50px;
+  padding-right: 150px;
 }
 
 .input-actions {
   position: absolute;
   bottom: 8px;
   right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 右侧预览区域 */
