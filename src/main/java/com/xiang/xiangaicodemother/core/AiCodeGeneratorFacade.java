@@ -11,6 +11,8 @@ import com.xiang.xiangaicodemother.ai.model.message.ToolExecutedMessage;
 import com.xiang.xiangaicodemother.ai.model.message.ToolRequestMessage;
 import com.xiang.xiangaicodemother.core.parser.CodeParserExecutor;
 import com.xiang.xiangaicodemother.core.saver.CodeFileSaverExecutor;
+import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
+import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.nio.file.Path;
 
 @Service
 @Slf4j
@@ -29,6 +32,9 @@ public class AiCodeGeneratorFacade {
 
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 统一入口，根据类型生成并保存代码
@@ -91,7 +97,7 @@ public class AiCodeGeneratorFacade {
                 VueCodeGeneratorService vueService =
                         aiCodeGeneratorServiceFactory.getVueCodeGeneratorService(appId);
                 TokenStream tokenStream = vueService.generateVueProjectCodeStream(appId, userMessage);
-                yield processTokenStream(tokenStream);
+                yield processTokenStream(tokenStream, appId);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -105,13 +111,31 @@ public class AiCodeGeneratorFacade {
      * “工具完成”两种结构化事件。这样无需覆盖依赖源码，也能保证前端与历史消息一致。
      */
     Flux<String> processTokenStream(TokenStream tokenStream) {
+        return processTokenStream(tokenStream, null);
+    }
+
+    Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
         return Flux.create(sink -> tokenStream
                 .onPartialResponse(partial -> sink.next(JSONUtil.toJsonStr(new AiResponseMessage(partial))))
                 .onToolExecuted(execution -> {
                     sink.next(JSONUtil.toJsonStr(new ToolRequestMessage(execution.request())));
                     sink.next(JSONUtil.toJsonStr(new ToolExecutedMessage(execution)));
                 })
-                .onCompleteResponse(response -> sink.complete())
+                .onCompleteResponse(response -> {
+                    try {
+                        if (appId != null) {
+                            Path projectPath = Path.of(AppConstant.CODE_OUTPUT_ROOT_DIR,
+                                    "vue_project_" + appId);
+                            if (!vueProjectBuilder.buildProject(projectPath.toString())) {
+                                throw new BusinessException(ErrorCode.OPERATION_ERROR,
+                                        "Vue 项目构建失败，请检查生成代码");
+                            }
+                        }
+                        sink.complete();
+                    } catch (Exception e) {
+                        sink.error(e);
+                    }
+                })
                 .onError(error -> {
                     log.error("Vue 工程生成失败", error);
                     sink.error(error);

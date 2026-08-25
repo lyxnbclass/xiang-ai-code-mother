@@ -549,7 +549,7 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       isGenerating.value = false
       eventSource?.close()
 
-      // Vue 工程会在流结束后异步构建，轮询到 dist 可访问后再刷新 iframe。
+      // 后端会在 Vue 工程构建完成后结束流，再刷新预览并保留轮询作为网络兜底。
       void refreshPreviewWhenReady()
     })
 

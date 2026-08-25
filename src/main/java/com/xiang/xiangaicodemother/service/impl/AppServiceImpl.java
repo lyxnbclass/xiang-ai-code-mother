@@ -9,7 +9,9 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xiang.xiangaicodemother.ai.AiCodeGeneratorServiceFactory;
 import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.xiang.xiangaicodemother.ai.model.CodeGenTypeRoutingResult;
+import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
 import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
@@ -79,7 +81,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private VueProjectBuilder vueProjectBuilder;
 
     @Resource
-    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
 
     @Resource
     private CodeGenWorkflow codeGenWorkflow;
@@ -94,8 +96,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
                 ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
         String initPrompt = appAddRequest.getInitPrompt().trim();
-        ThrowUtils.throwIf(initPrompt.length() > 1000,
-                ErrorCode.PARAMS_ERROR, "初始化 prompt 不能超过 1000 字");
+        validatePromptSafety(initPrompt);
 
         CodeGenTypeEnum selectedType = selectCodeGenType(initPrompt);
         App app = new App();
@@ -112,6 +113,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     private CodeGenTypeEnum selectCodeGenType(String initPrompt) {
         try {
+            AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService =
+                    aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
             CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
             if (result != null && result.getCodeGenType() != null) {
                 return result.getCodeGenType();
@@ -146,6 +149,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser, boolean agent) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
+        validatePromptSafety(message);
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
                 ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
 
@@ -172,6 +176,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         return streamHandlerExecutor.doExecute(
                 contentFlux, chatHistoryService, appId, loginUser, codeGenType);
+    }
+
+    private void validatePromptSafety(String prompt) {
+        PromptSafetyInputGuardrail.findViolation(prompt)
+                .ifPresent(message -> {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, message);
+                });
     }
 
     @Override

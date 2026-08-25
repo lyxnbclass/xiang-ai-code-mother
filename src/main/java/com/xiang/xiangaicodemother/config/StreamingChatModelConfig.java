@@ -7,20 +7,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
-/**
- * Vue 工程生成专用流式模型。独立 Bean 避免和 starter 自动配置的模型重名。
- */
-@Configuration
-public class ReasoningStreamingChatModelConfig {
+/** 为每个应用对话提供独立的普通流式模型，避免共享实例阻塞并发请求。 */
+@Configuration(proxyBeanMethods = false)
+public class StreamingChatModelConfig {
 
-    @Bean("reasoningStreamingChatModelPrototype")
+    @Bean("streamingChatModelPrototype")
     @Scope("prototype")
-    public StreamingChatModel reasoningStreamingChatModelPrototype(
+    public StreamingChatModel streamingChatModelPrototype(
             @Value("${langchain4j.open-ai.streaming-chat-model.base-url}") String baseUrl,
             @Value("${langchain4j.open-ai.streaming-chat-model.api-key}") String apiKey,
-            @Value("${VUE_REASONING_MODEL_NAME:deepseek-chat}") String modelName,
-            @Value("${VUE_REASONING_MAX_TOKENS:8192}") Integer maxTokens,
-            @Value("${VUE_REASONING_TEMPERATURE:0.1}") Double temperature) {
+            @Value("${langchain4j.open-ai.streaming-chat-model.model-name}") String modelName,
+            @Value("${langchain4j.open-ai.streaming-chat-model.max-tokens:8192}") Integer maxTokens,
+            @Value("${langchain4j.open-ai.streaming-chat-model.temperature:0.1}") Double temperature) {
         return OpenAiStreamingChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)

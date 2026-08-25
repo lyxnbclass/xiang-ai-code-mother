@@ -14,6 +14,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
       password: ${REDIS_PASSWORD:}
       ttl: ${REDIS_CHAT_MEMORY_TTL:3600}
   profiles:
@@ -70,4 +71,9 @@ workflow:
     dashscope-api-key: ${DASHSCOPE_API_KEY:}
     dashscope-model: ${DASHSCOPE_IMAGE_MODEL:wan2.2-t2i-flash}
     max-results-per-task: ${WORKFLOW_IMAGE_MAX_RESULTS:6}
+
+app:
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
 # http://localhost:8123/api/doc.html#/home

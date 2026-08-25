@@ -2,6 +2,7 @@ package com.xiang.xiangaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
 import com.xiang.xiangaicodemother.ai.tools.ToolManager;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
@@ -17,7 +18,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationContext;
 
 import java.time.Duration;
 
@@ -28,16 +29,11 @@ import java.time.Duration;
 @Slf4j
 public class AiCodeGeneratorServiceFactory {
 
-    @Resource
+    @Resource(name = "openAiChatModel")
     private ChatModel chatModel;
 
     @Resource
-    @Qualifier("openAiStreamingChatModel")
-    private StreamingChatModel openAiStreamingChatModel;
-
-    @Resource
-    @Qualifier("reasoningStreamingChatModel")
-    private StreamingChatModel reasoningStreamingChatModel;
+    private ApplicationContext applicationContext;
 
     @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
@@ -113,11 +109,16 @@ public class AiCodeGeneratorServiceFactory {
                 .build();
         chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
         return switch (codeGenType) {
-            case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
-                    .chatModel(chatModel)
-                    .streamingChatModel(openAiStreamingChatModel)
-                    .chatMemory(chatMemory)
-                    .build();
+            case HTML, MULTI_FILE -> {
+                StreamingChatModel streamingChatModel = applicationContext.getBean(
+                        "streamingChatModelPrototype", StreamingChatModel.class);
+                yield AiServices.builder(AiCodeGeneratorService.class)
+                        .chatModel(chatModel)
+                        .streamingChatModel(streamingChatModel)
+                        .chatMemory(chatMemory)
+                        .inputGuardrails(new PromptSafetyInputGuardrail())
+                        .build();
+            }
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
                     "不支持的代码生成类型: " + codeGenType.getValue());
         };
@@ -131,12 +132,16 @@ public class AiCodeGeneratorServiceFactory {
                 .maxMessages(20)
                 .build();
         chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        StreamingChatModel reasoningStreamingChatModel = applicationContext.getBean(
+                "reasoningStreamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(VueCodeGeneratorService.class)
                 .streamingChatModel(reasoningStreamingChatModel)
                 .chatMemoryProvider(memoryId -> chatMemory)
                 .tools((Object[]) toolManager.getAllTools())
                 .hallucinatedToolNameStrategy(request -> ToolExecutionResultMessage.from(
                         request, "Error: there is no tool called " + request.name()))
+                .maxSequentialToolsInvocations(20)
+                .inputGuardrails(new PromptSafetyInputGuardrail())
                 .build();
     }
 
@@ -145,9 +150,12 @@ public class AiCodeGeneratorServiceFactory {
      */
     @Bean
     public AiCodeGeneratorService aiCodeGeneratorService() {
+        StreamingChatModel streamingChatModel = applicationContext.getBean(
+                "streamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(AiCodeGeneratorService.class)
                 .chatModel(chatModel)
-                .streamingChatModel(openAiStreamingChatModel)
+                .streamingChatModel(streamingChatModel)
+                .inputGuardrails(new PromptSafetyInputGuardrail())
                 .build();
     }
 

@@ -22,6 +22,8 @@ import com.xiang.xiangaicodemother.model.dto.app.AppUpdateRequest;
 import com.xiang.xiangaicodemother.model.entity.App;
 import com.xiang.xiangaicodemother.model.entity.User;
 import com.xiang.xiangaicodemother.model.vo.AppVO;
+import com.xiang.xiangaicodemother.ratelimiter.annotation.RateLimit;
+import com.xiang.xiangaicodemother.ratelimiter.enums.RateLimitType;
 import com.xiang.xiangaicodemother.service.AppService;
 import com.xiang.xiangaicodemother.service.ProjectDownloadService;
 import com.xiang.xiangaicodemother.service.UserService;
@@ -29,6 +31,8 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,6 +68,8 @@ public class AppController {
     private ProjectDownloadService projectDownloadService;
 
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(key = "ai_chat", limitType = RateLimitType.USER, rate = 5, rateInterval = 60,
+            message = "AI 对话请求过于频繁，请稍后再试")
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,
                                                        @RequestParam(defaultValue = "false") boolean agent,
@@ -127,6 +133,7 @@ public class AppController {
     }
 
     @PostMapping("/update")
+    @CacheEvict(value = "good_app_page", allEntries = true)
     public BaseResponse<Boolean> updateApp(@RequestBody AppUpdateRequest requestBody,
                                            HttpServletRequest request) {
         validateId(requestBody == null ? null : requestBody.getId());
@@ -150,6 +157,7 @@ public class AppController {
     }
 
     @PostMapping("/delete")
+    @CacheEvict(value = "good_app_page", allEntries = true)
     public BaseResponse<Boolean> deleteApp(@RequestBody DeleteRequest requestBody,
                                            HttpServletRequest request) {
         validateId(requestBody == null ? null : requestBody.getId());
@@ -179,6 +187,9 @@ public class AppController {
     }
 
     @PostMapping("/good/list/page/vo")
+    @Cacheable(value = "good_app_page",
+            key = "T(com.xiang.xiangaicodemother.utils.CacheKeyUtils).generateKey(#requestBody)",
+            condition = "#requestBody != null && #requestBody.pageNum <= 10")
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest requestBody) {
         validateUserPageRequest(requestBody);
         requestBody.setPriority(AppConstant.GOOD_APP_PRIORITY);
@@ -187,6 +198,7 @@ public class AppController {
 
     @PostMapping("/admin/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @CacheEvict(value = "good_app_page", allEntries = true)
     public BaseResponse<Boolean> deleteAppByAdmin(@RequestBody DeleteRequest requestBody) {
         validateId(requestBody == null ? null : requestBody.getId());
         getExistingApp(requestBody.getId());
@@ -195,6 +207,7 @@ public class AppController {
 
     @PostMapping("/admin/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @CacheEvict(value = "good_app_page", allEntries = true)
     public BaseResponse<Boolean> updateAppByAdmin(@RequestBody AppAdminUpdateRequest requestBody) {
         validateId(requestBody == null ? null : requestBody.getId());
         getExistingApp(requestBody.getId());
