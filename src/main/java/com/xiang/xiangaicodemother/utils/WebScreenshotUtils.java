@@ -3,8 +3,8 @@ package com.xiang.xiangaicodemother.utils;
 import cn.hutool.core.img.ImgUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import com.xiang.xiangaicodemother.config.properties.CodeDeployProperties;
 import com.xiang.xiangaicodemother.config.properties.ScreenshotProperties;
-import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import io.github.bonigarcia.wdm.WebDriverManager;
@@ -36,6 +36,8 @@ import java.util.UUID;
 public class WebScreenshotUtils {
 
     private final ScreenshotProperties properties;
+
+    private final CodeDeployProperties codeDeployProperties;
 
     /**
      * 截取已部署应用，并返回压缩后的临时图片路径。
@@ -84,7 +86,7 @@ public class WebScreenshotUtils {
         }
         try {
             URI target = URI.create(webUrl).normalize();
-            URI deployHost = URI.create(AppConstant.CODE_DEPLOY_HOST).normalize();
+            URI deployHost = URI.create(codeDeployProperties.normalizedDeployHost()).normalize();
             boolean validScheme = "http".equalsIgnoreCase(target.getScheme())
                     || "https".equalsIgnoreCase(target.getScheme());
             boolean sameOrigin = validScheme

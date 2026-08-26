@@ -12,6 +12,7 @@ import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingService;
 import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.xiang.xiangaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
+import com.xiang.xiangaicodemother.config.properties.CodeDeployProperties;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
 import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
@@ -88,6 +89,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private AppCoverService appCoverService;
+
+    @Resource
+    private CodeDeployProperties codeDeployProperties;
 
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
@@ -235,7 +239,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updated = this.updateById(updateApp);
         ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
-        String appDeployUrl = String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        String appDeployUrl = String.format("%s/%s/", codeDeployProperties.normalizedDeployHost(), deployKey);
         appCoverService.generateAppCoverAsync(appId, appDeployUrl);
         return appDeployUrl;
     }
