@@ -12,7 +12,4 @@ public interface AppConstant {
     String CODE_OUTPUT_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
 
     String CODE_DEPLOY_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_deploy";
-
-    String CODE_DEPLOY_HOST = System.getenv().getOrDefault("APP_DEPLOY_HOST", "http://localhost")
-            .replaceAll("/+$", "");
 }

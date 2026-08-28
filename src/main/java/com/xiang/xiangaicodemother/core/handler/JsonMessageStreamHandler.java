@@ -10,8 +10,6 @@ import com.xiang.xiangaicodemother.ai.model.message.ToolExecutedMessage;
 import com.xiang.xiangaicodemother.ai.model.message.ToolRequestMessage;
 import com.xiang.xiangaicodemother.ai.tools.BaseTool;
 import com.xiang.xiangaicodemother.ai.tools.ToolManager;
-import com.xiang.xiangaicodemother.constant.AppConstant;
-import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
 import com.xiang.xiangaicodemother.model.entity.User;
 import com.xiang.xiangaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xiang.xiangaicodemother.service.ChatHistoryService;
@@ -20,16 +18,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
 @Component
 @Slf4j
 public class JsonMessageStreamHandler {
-
-    @Resource
-    private VueProjectBuilder vueProjectBuilder;
 
     @Resource
     private ToolManager toolManager;
@@ -53,8 +47,6 @@ public class JsonMessageStreamHandler {
                         chatHistoryService.addChatMessage(appId, history.toString(),
                                 ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     }
-                    Path projectPath = Path.of(AppConstant.CODE_OUTPUT_ROOT_DIR, "vue_project_" + appId);
-                    vueProjectBuilder.buildProjectAsync(projectPath.toString());
                 })
                 .doOnError(error -> chatHistoryService.addChatMessage(appId,
                         "AI 回复失败：" + StrUtil.blankToDefault(error.getMessage(), "未知错误"),

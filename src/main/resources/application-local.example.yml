@@ -18,10 +18,18 @@ langchain4j:
       max-tokens: 8192
       log-requests: true
       log-responses: true
+    # 路由任务输出很短，可独立使用低成本模型；未配置时会复用上面的聊天模型。
+    routing-chat-model:
+      base-url: ${ROUTING_AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
+      api-key: ${ROUTING_AI_API_KEY:${DASHSCOPE_API_KEY:${DEEPSEEK_API_KEY}}}
+      model-name: ${ROUTING_AI_MODEL_NAME:qwen-turbo}
+      max-tokens: 100
+      temperature: 0.0
 
 # Vue 工程工具调用模型可单独覆盖；默认复用兼容工具调用的 deepseek-chat。
 # VUE_REASONING_MODEL_NAME=deepseek-chat
 # VUE_REASONING_MAX_TOKENS=8192
+# AI_MODEL_MAX_RETRIES=3
 
 # 可选：部署后自动生成封面。建议通过环境变量配置，避免提交密钥。
 # COS_ENABLED=true

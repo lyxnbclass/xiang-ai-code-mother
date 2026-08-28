@@ -9,7 +9,10 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.xiang.xiangaicodemother.ai.AiCodeGeneratorServiceFactory;
 import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.xiang.xiangaicodemother.ai.model.CodeGenTypeRoutingResult;
+import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
+import com.xiang.xiangaicodemother.config.properties.CodeDeployProperties;
 import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.core.AiCodeGeneratorFacade;
 import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
@@ -27,6 +30,8 @@ import com.xiang.xiangaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import com.xiang.xiangaicodemother.model.vo.AppVO;
 import com.xiang.xiangaicodemother.model.vo.UserVO;
+import com.xiang.xiangaicodemother.monitor.MonitorContext;
+import com.xiang.xiangaicodemother.monitor.MonitorContextHolder;
 import com.xiang.xiangaicodemother.service.AppService;
 import com.xiang.xiangaicodemother.service.AppCoverService;
 import com.xiang.xiangaicodemother.service.ChatHistoryService;
@@ -79,13 +84,16 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private VueProjectBuilder vueProjectBuilder;
 
     @Resource
-    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    private AiCodeGenTypeRoutingServiceFactory aiCodeGenTypeRoutingServiceFactory;
 
     @Resource
     private CodeGenWorkflow codeGenWorkflow;
 
     @Resource
     private AppCoverService appCoverService;
+
+    @Resource
+    private CodeDeployProperties codeDeployProperties;
 
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
@@ -94,8 +102,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
                 ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
         String initPrompt = appAddRequest.getInitPrompt().trim();
-        ThrowUtils.throwIf(initPrompt.length() > 1000,
-                ErrorCode.PARAMS_ERROR, "初始化 prompt 不能超过 1000 字");
+        validatePromptSafety(initPrompt);
 
         CodeGenTypeEnum selectedType = selectCodeGenType(initPrompt);
         App app = new App();
@@ -112,6 +119,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     private CodeGenTypeEnum selectCodeGenType(String initPrompt) {
         try {
+            AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService =
+                    aiCodeGenTypeRoutingServiceFactory.createAiCodeGenTypeRoutingService();
             CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
             if (result != null && result.getCodeGenType() != null) {
                 return result.getCodeGenType();
@@ -146,6 +155,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser, boolean agent) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 错误");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "提示词不能为空");
+        validatePromptSafety(message);
         ThrowUtils.throwIf(loginUser == null || loginUser.getId() == null,
                 ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
 
@@ -162,16 +172,29 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         ThrowUtils.throwIf(!userMessageSaved, ErrorCode.OPERATION_ERROR, "保存用户消息失败");
 
+        MonitorContext monitorContext = new MonitorContext(
+                loginUser.getId().toString(), appId.toString());
         Flux<String> contentFlux = agent
                 ? codeGenWorkflow.executeWithFlux(message, appId, codeGenType)
                 : aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+        Flux<String> responseFlux;
         if (agent) {
             // 工作流返回面向用户的进度文本，且已在流程内完成 Vue 构建。
-            return new SimpleTextStreamHandler().handle(
+            responseFlux = new SimpleTextStreamHandler().handle(
                     contentFlux, chatHistoryService, appId, loginUser);
+        } else {
+            responseFlux = streamHandlerExecutor.doExecute(
+                    contentFlux, chatHistoryService, appId, loginUser, codeGenType);
         }
-        return streamHandlerExecutor.doExecute(
-                contentFlux, chatHistoryService, appId, loginUser, codeGenType);
+        return responseFlux.contextWrite(context ->
+                context.put(MonitorContextHolder.CONTEXT_KEY, monitorContext));
+    }
+
+    private void validatePromptSafety(String prompt) {
+        PromptSafetyInputGuardrail.findViolation(prompt)
+                .ifPresent(message -> {
+                    throw new BusinessException(ErrorCode.PARAMS_ERROR, message);
+                });
     }
 
     @Override
@@ -224,7 +247,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateApp.setDeployedTime(LocalDateTime.now());
         boolean updated = this.updateById(updateApp);
         ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
-        String appDeployUrl = String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
+        String appDeployUrl = String.format("%s/%s/", codeDeployProperties.normalizedDeployHost(), deployKey);
         appCoverService.generateAppCoverAsync(appId, appDeployUrl);
         return appDeployUrl;
     }

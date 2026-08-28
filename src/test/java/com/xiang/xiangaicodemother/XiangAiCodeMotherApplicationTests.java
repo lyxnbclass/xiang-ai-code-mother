@@ -1,7 +1,12 @@
 package com.xiang.xiangaicodemother;
 
+import dev.langchain4j.model.chat.StreamingChatModel;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 @SpringBootTest(properties = {
         "DEEPSEEK_API_KEY=test-key",
@@ -14,8 +19,21 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 class XiangAiCodeMotherApplicationTests {
 
+    @Resource
+    private ApplicationContext applicationContext;
+
     @Test
     void contextLoads() {
+    }
+
+    @Test
+    void streamingModelsUsePrototypeScope() {
+        StreamingChatModel first = applicationContext.getBean(
+                "streamingChatModelPrototype", StreamingChatModel.class);
+        StreamingChatModel second = applicationContext.getBean(
+                "streamingChatModelPrototype", StreamingChatModel.class);
+
+        assertNotSame(first, second);
     }
 
 }

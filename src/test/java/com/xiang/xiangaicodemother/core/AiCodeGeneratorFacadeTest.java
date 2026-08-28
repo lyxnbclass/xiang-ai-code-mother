@@ -5,6 +5,7 @@ import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import reactor.core.publisher.Flux;
 
@@ -12,6 +13,7 @@ import java.io.File;
 import java.util.List;
 
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "DEEPSEEK_API_KEY", matches = ".+")
 class AiCodeGeneratorFacadeTest {
 
     @Resource

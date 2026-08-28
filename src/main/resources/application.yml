@@ -14,6 +14,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
       password: ${REDIS_PASSWORD:}
       ttl: ${REDIS_CHAT_MEMORY_TTL:3600}
   profiles:
@@ -70,4 +71,26 @@ workflow:
     dashscope-api-key: ${DASHSCOPE_API_KEY:}
     dashscope-model: ${DASHSCOPE_IMAGE_MODEL:wan2.2-t2i-flash}
     max-results-per-task: ${WORKFLOW_IMAGE_MAX_RESULTS:6}
+
+app:
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
+
+# 生成应用的公开访问前缀；生产环境通常设置为 https://your-domain.com/dist。
+code:
+  deploy-host: ${APP_DEPLOY_HOST:http://localhost}
+
+# Actuator 与 Prometheus。默认仅暴露只读监控端点，生产环境可通过网关限制来源。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS:health,info,prometheus}
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:never}
+  metrics:
+    tags:
+      application: ${spring.application.name}
 # http://localhost:8123/api/doc.html#/home

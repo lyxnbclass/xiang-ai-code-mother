@@ -2,8 +2,8 @@ package com.xiang.xiangaicodemother.utils;
 
 import cn.hutool.core.io.FileUtil;
 import com.sun.net.httpserver.HttpServer;
+import com.xiang.xiangaicodemother.config.properties.CodeDeployProperties;
 import com.xiang.xiangaicodemother.config.properties.ScreenshotProperties;
-import com.xiang.xiangaicodemother.constant.AppConstant;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -18,11 +18,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class WebScreenshotUtilsTest {
 
-    private final WebScreenshotUtils utils = new WebScreenshotUtils(new ScreenshotProperties());
+    private final CodeDeployProperties codeDeployProperties = new CodeDeployProperties();
+
+    private final WebScreenshotUtils utils = new WebScreenshotUtils(
+            new ScreenshotProperties(), codeDeployProperties);
 
     @Test
     void shouldOnlyAllowConfiguredDeployOrigin() {
-        assertDoesNotThrow(() -> utils.validateScreenshotUrl(AppConstant.CODE_DEPLOY_HOST + "/app-key/"));
+        assertDoesNotThrow(() -> utils.validateScreenshotUrl(
+                codeDeployProperties.normalizedDeployHost() + "/app-key/"));
         assertThrows(BusinessException.class,
                 () -> utils.validateScreenshotUrl("http://localhost:6553/api/private"));
         assertThrows(BusinessException.class,
@@ -47,7 +51,9 @@ class WebScreenshotUtilsTest {
         server.start();
         ScreenshotProperties properties = new ScreenshotProperties();
         properties.setRenderDelayMillis(0);
-        WebScreenshotUtils integrationUtils = new WebScreenshotUtils(properties);
+        CodeDeployProperties integrationDeployProperties = new CodeDeployProperties();
+        integrationDeployProperties.setDeployHost("http://localhost:" + port);
+        WebScreenshotUtils integrationUtils = new WebScreenshotUtils(properties, integrationDeployProperties);
         Path screenshot = null;
         try {
             screenshot = integrationUtils.saveWebPageScreenshot("http://localhost:" + port + "/demo/");

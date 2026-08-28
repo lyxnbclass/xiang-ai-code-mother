@@ -5,13 +5,19 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.tool.ToolExecution;
+import com.xiang.xiangaicodemother.core.builder.VueProjectBuilder;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.endsWith;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AiCodeGeneratorTokenStreamTest {
 
@@ -26,6 +32,18 @@ class AiCodeGeneratorTokenStreamTest {
         assertTrue(chunks.get(0).contains("ai_response"));
         assertTrue(chunks.get(1).contains("tool_request"));
         assertTrue(chunks.get(2).contains("tool_executed"));
+    }
+
+    @Test
+    void buildsVueProjectBeforeCompletingStream() {
+        AiCodeGeneratorFacade facade = new AiCodeGeneratorFacade();
+        VueProjectBuilder builder = mock(VueProjectBuilder.class);
+        when(builder.buildProject(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        ReflectionTestUtils.setField(facade, "vueProjectBuilder", builder);
+
+        facade.processTokenStream(new FakeTokenStream(), 42L).collectList().block();
+
+        verify(builder).buildProject(endsWith("vue_project_42"));
     }
 
     private static class FakeTokenStream implements TokenStream {

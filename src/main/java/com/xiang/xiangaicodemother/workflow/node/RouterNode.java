@@ -1,6 +1,6 @@
 package com.xiang.xiangaicodemother.workflow.node;
 
-import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.xiang.xiangaicodemother.ai.AiCodeGenTypeRoutingServiceFactory;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import com.xiang.xiangaicodemother.workflow.state.WorkflowContext;
 import lombok.RequiredArgsConstructor;
@@ -16,13 +16,14 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 @Component
 @RequiredArgsConstructor
 public class RouterNode {
-    private final AiCodeGenTypeRoutingService routingService;
+    private final AiCodeGenTypeRoutingServiceFactory routingServiceFactory;
 
     public AsyncNodeAction<MessagesState<String>> action() {
         return node_async(state -> {
             WorkflowContext context = WorkflowContext.from(state);
             if (context.getGenerationType() == null) {
                 try {
+                    var routingService = routingServiceFactory.createAiCodeGenTypeRoutingService();
                     var result = routingService.routeCodeGenType(context.getOriginalPrompt());
                     context.setGenerationType(result == null ? null : result.getCodeGenType());
                     if (context.getGenerationType() == null) {
