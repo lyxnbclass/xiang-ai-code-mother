@@ -30,6 +30,8 @@ import com.xiang.xiangaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
 import com.xiang.xiangaicodemother.model.vo.AppVO;
 import com.xiang.xiangaicodemother.model.vo.UserVO;
+import com.xiang.xiangaicodemother.monitor.MonitorContext;
+import com.xiang.xiangaicodemother.monitor.MonitorContextHolder;
 import com.xiang.xiangaicodemother.service.AppService;
 import com.xiang.xiangaicodemother.service.AppCoverService;
 import com.xiang.xiangaicodemother.service.ChatHistoryService;
@@ -170,16 +172,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         ThrowUtils.throwIf(!userMessageSaved, ErrorCode.OPERATION_ERROR, "保存用户消息失败");
 
+        MonitorContext monitorContext = new MonitorContext(
+                loginUser.getId().toString(), appId.toString());
         Flux<String> contentFlux = agent
                 ? codeGenWorkflow.executeWithFlux(message, appId, codeGenType)
                 : aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenType, appId);
+        Flux<String> responseFlux;
         if (agent) {
             // 工作流返回面向用户的进度文本，且已在流程内完成 Vue 构建。
-            return new SimpleTextStreamHandler().handle(
+            responseFlux = new SimpleTextStreamHandler().handle(
                     contentFlux, chatHistoryService, appId, loginUser);
+        } else {
+            responseFlux = streamHandlerExecutor.doExecute(
+                    contentFlux, chatHistoryService, appId, loginUser, codeGenType);
         }
-        return streamHandlerExecutor.doExecute(
-                contentFlux, chatHistoryService, appId, loginUser, codeGenType);
+        return responseFlux.contextWrite(context ->
+                context.put(MonitorContextHolder.CONTEXT_KEY, monitorContext));
     }
 
     private void validatePromptSafety(String prompt) {
