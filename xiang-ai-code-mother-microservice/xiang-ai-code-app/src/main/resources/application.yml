@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: ${APP_SERVICE_NAME:xiang-ai-code-app}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  session:
+    store-type: redis
+    timeout: ${SESSION_TIMEOUT:30d}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/xiang_ai_code_mother}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+      ttl: ${REDIS_CHAT_MEMORY_TTL:3600}
+
+server:
+  port: ${APP_SERVER_PORT:8125}
+  servlet:
+    context-path: /api
+    session:
+      cookie:
+        max-age: ${SESSION_COOKIE_MAX_AGE:30d}
+        http-only: true
+
+code:
+  deploy-host: ${CODE_DEPLOY_HOST:http://localhost}
+
+langchain4j:
+  open-ai:
+    chat-model:
+      base-url: ${AI_BASE_URL:https://api.deepseek.com}
+      api-key: ${AI_API_KEY:}
+      model-name: ${AI_MODEL_NAME:deepseek-chat}
+      max-tokens: ${AI_MAX_TOKENS:8192}
+      log-requests: ${AI_LOG_REQUESTS:false}
+      log-responses: ${AI_LOG_RESPONSES:false}
+    streaming-chat-model:
+      base-url: ${AI_BASE_URL:https://api.deepseek.com}
+      api-key: ${AI_API_KEY:}
+      model-name: ${AI_MODEL_NAME:deepseek-chat}
+      max-tokens: ${AI_MAX_TOKENS:8192}
+      temperature: ${AI_TEMPERATURE:0.1}
+      log-requests: ${AI_LOG_REQUESTS:false}
+      log-responses: ${AI_LOG_RESPONSES:false}
+    reasoning-streaming-chat-model:
+      base-url: ${VUE_REASONING_BASE_URL:${AI_BASE_URL:https://api.deepseek.com}}
+      api-key: ${VUE_REASONING_API_KEY:${AI_API_KEY:}}
+      model-name: ${VUE_REASONING_MODEL_NAME:deepseek-reasoner}
+      max-tokens: ${VUE_REASONING_MAX_TOKENS:32768}
+      temperature: ${VUE_REASONING_TEMPERATURE:0.1}
+      log-requests: ${AI_LOG_REQUESTS:false}
+      log-responses: ${AI_LOG_RESPONSES:false}
+    routing-chat-model:
+      base-url: ${ROUTING_AI_BASE_URL:${AI_BASE_URL:https://api.deepseek.com}}
+      api-key: ${ROUTING_AI_API_KEY:${AI_API_KEY:}}
+      model-name: ${ROUTING_AI_MODEL_NAME:deepseek-chat}
+      max-tokens: ${ROUTING_AI_MAX_TOKENS:100}
+      temperature: ${ROUTING_AI_TEMPERATURE:0.0}
+      log-requests: ${AI_LOG_REQUESTS:false}
+      log-responses: ${AI_LOG_RESPONSES:false}
+
+springdoc:
+  group-configs:
+    - group: default
+      packages-to-scan: com.xiang.xiangaicodemother.controller
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+dubbo:
+  registry:
+    address: ${DUBBO_REGISTRY_ADDRESS:nacos://127.0.0.1:8848?username=nacos&password=nacos}
+    register-mode: instance
+  protocol:
+    name: tri
+    port: ${APP_DUBBO_PORT:50053}
+  consumer:
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:120000}
+  provider:
+    timeout: ${DUBBO_PROVIDER_TIMEOUT:120000}

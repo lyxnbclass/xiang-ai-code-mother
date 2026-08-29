@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: ${SCREENSHOT_SERVICE_NAME:xiang-ai-code-screenshot}
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+server:
+  port: ${SCREENSHOT_SERVER_PORT:8127}
+  servlet:
+    context-path: /api
+
+code:
+  deploy-host: ${CODE_DEPLOY_HOST:http://localhost}
+
+screenshot:
+  width: ${SCREENSHOT_WIDTH:1600}
+  height: ${SCREENSHOT_HEIGHT:900}
+  page-load-timeout-seconds: ${SCREENSHOT_PAGE_LOAD_TIMEOUT_SECONDS:30}
+  ready-timeout-seconds: ${SCREENSHOT_READY_TIMEOUT_SECONDS:10}
+  render-delay-millis: ${SCREENSHOT_RENDER_DELAY_MILLIS:2000}
+  no-sandbox: ${SCREENSHOT_NO_SANDBOX:false}
+  driver-path: ${CHROME_DRIVER_PATH:}
+  browser-path: ${CHROME_BROWSER_PATH:}
+
+cos:
+  client:
+    host: ${COS_HOST}
+    secretId: ${COS_SECRET_ID}
+    secretKey: ${COS_SECRET_KEY}
+    region: ${COS_REGION}
+    bucket: ${COS_BUCKET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+dubbo:
+  registry:
+    address: ${DUBBO_REGISTRY_ADDRESS:nacos://127.0.0.1:8848?username=nacos&password=nacos}
+    register-mode: instance
+  protocol:
+    name: tri
+    port: ${SCREENSHOT_DUBBO_PORT:50052}
+  consumer:
+    timeout: ${DUBBO_CONSUMER_TIMEOUT:120000}
+  provider:
+    timeout: ${DUBBO_PROVIDER_TIMEOUT:120000}
