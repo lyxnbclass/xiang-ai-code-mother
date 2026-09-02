@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
 import com.xiang.xiangaicodemother.ai.tools.*;
+import com.xiang.xiangaicodemother.config.properties.AiChatMemoryProperties;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
@@ -17,7 +18,6 @@ import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
@@ -40,6 +40,9 @@ public class AiCodeGeneratorServiceFactory {
 
     @Resource
     private ToolManager toolManager;
+
+    @Resource
+    private AiChatMemoryProperties chatMemoryProperties;
 
     /**
      * AI 服务实例缓存
@@ -75,6 +78,12 @@ public class AiCodeGeneratorServiceFactory {
      * @return
      */
     public AiCodeGeneratorService getAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
+        if (appId <= 0) {
+            throw new IllegalArgumentException("appId 必须大于 0");
+        }
+        if (codeGenType == null) {
+            throw new IllegalArgumentException("代码生成类型不能为空");
+        }
         String cacheKey = buildCacheKey(appId, codeGenType);
         return serviceCache.get(cacheKey, key -> createAiCodeGeneratorService(appId, codeGenType));
     }
@@ -93,10 +102,11 @@ public class AiCodeGeneratorServiceFactory {
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
+                .maxMessages(chatMemoryProperties.getMaxMessages())
                 .build();
         // 从数据库中加载对话历史到记忆中
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        chatHistoryService.loadChatHistoryToMemory(
+                appId, chatMemory, chatMemoryProperties.getMaxMessages());
         return switch (codeGenType) {
             // Vue 项目生成，使用工具调用和推理模型
             case VUE_PROJECT -> {
@@ -106,7 +116,7 @@ public class AiCodeGeneratorServiceFactory {
                         .chatModel(chatModel)
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId -> chatMemory)
-                        .tools(toolManager.getAllTools())
+                        .tools((Object[]) toolManager.getAllTools())
                         // 处理工具调用幻觉问题
                         .hallucinatedToolNameStrategy(toolExecutionRequest ->
                                 ToolExecutionResultMessage.from(toolExecutionRequest,
@@ -132,16 +142,6 @@ public class AiCodeGeneratorServiceFactory {
             default ->
                     throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型: " + codeGenType.getValue());
         };
-    }
-
-    /**
-     * 创建 AI 代码生成器服务
-     *
-     * @return
-     */
-    @Bean
-    public AiCodeGeneratorService aiCodeGeneratorService() {
-        return getAiCodeGeneratorService(0);
     }
 
     /**

@@ -20,12 +20,14 @@
 - MySQL 8
 - Redis 6 或更高版本
 - Nacos 2.x（单机开发环境可使用 `startup.cmd -m standalone`）
-- 可用的 AI 模型 API Key
+- 可用的 AI 模型 API Key（默认适配智谱 GLM-4.6 Coding Plan）
 - 截图功能需要 Chrome/Chromium 和腾讯云 COS 配置
 
 先执行根目录的 `sql/create_table.sql` 初始化 `xiang_ai_code_mother` 数据库。复制 `.env.example` 中的配置到 IDE 环境变量或终端环境变量中，不要把真实密钥写入配置文件或提交到仓库。
 
 三个服务必须使用相同的 `REDIS_HOST`、`REDIS_PORT`、`REDIS_DATABASE` 和 `REDIS_PASSWORD`，这样应用服务才能读取用户服务创建的登录 Session。
+
+AI 代码生成默认使用 `https://open.bigmodel.cn/api/coding/paas/v4` 和 `glm-4.6`，流式请求超时为 300 秒，对话记忆窗口为 50 条。可通过 `AI_BASE_URL`、`AI_MODEL_NAME`、`AI_MODEL_TIMEOUT` 和 `AI_CHAT_MEMORY_MAX_MESSAGES` 切换供应商或调整限制。
 
 ## 构建与启动
 

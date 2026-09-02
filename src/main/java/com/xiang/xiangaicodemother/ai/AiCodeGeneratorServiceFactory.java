@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.xiang.xiangaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
 import com.xiang.xiangaicodemother.ai.tools.ToolManager;
+import com.xiang.xiangaicodemother.config.properties.AiChatMemoryProperties;
 import com.xiang.xiangaicodemother.exception.BusinessException;
 import com.xiang.xiangaicodemother.exception.ErrorCode;
 import com.xiang.xiangaicodemother.model.enums.CodeGenTypeEnum;
@@ -43,6 +44,9 @@ public class AiCodeGeneratorServiceFactory {
 
     @Resource
     private ToolManager toolManager;
+
+    @Resource
+    private AiChatMemoryProperties chatMemoryProperties;
 
     private final Cache<String, AiCodeGeneratorService> serviceCache = Caffeine.newBuilder()
             .maximumSize(1000)
@@ -105,9 +109,10 @@ public class AiCodeGeneratorServiceFactory {
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
+                .maxMessages(chatMemoryProperties.getMaxMessages())
                 .build();
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        chatHistoryService.loadChatHistoryToMemory(
+                appId, chatMemory, chatMemoryProperties.getMaxMessages());
         return switch (codeGenType) {
             case HTML, MULTI_FILE -> {
                 StreamingChatModel streamingChatModel = applicationContext.getBean(
@@ -129,9 +134,10 @@ public class AiCodeGeneratorServiceFactory {
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory.builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
+                .maxMessages(chatMemoryProperties.getMaxMessages())
                 .build();
-        chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        chatHistoryService.loadChatHistoryToMemory(
+                appId, chatMemory, chatMemoryProperties.getMaxMessages());
         StreamingChatModel reasoningStreamingChatModel = applicationContext.getBean(
                 "reasoningStreamingChatModelPrototype", StreamingChatModel.class);
         return AiServices.builder(VueCodeGeneratorService.class)

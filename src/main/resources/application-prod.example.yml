@@ -16,35 +16,44 @@ spring:
 langchain4j:
   open-ai:
     chat-model:
-      base-url: ${AI_BASE_URL:https://api.deepseek.com}
-      api-key: ${DEEPSEEK_API_KEY}
-      model-name: ${AI_CHAT_MODEL_NAME:deepseek-chat}
+      base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}
+      api-key: ${AI_API_KEY:${DEEPSEEK_API_KEY}}
+      model-name: ${AI_CHAT_MODEL_NAME:glm-4.6}
       response-format: json_object
       max-tokens: ${AI_CHAT_MAX_TOKENS:8192}
       max-retries: ${AI_MODEL_MAX_RETRIES:3}
+      timeout: ${AI_MODEL_TIMEOUT:300s}
       log-requests: false
       log-responses: false
     streaming-chat-model:
-      base-url: ${AI_BASE_URL:https://api.deepseek.com}
-      api-key: ${DEEPSEEK_API_KEY}
-      model-name: ${AI_STREAMING_MODEL_NAME:deepseek-chat}
+      base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}
+      api-key: ${AI_API_KEY:${DEEPSEEK_API_KEY}}
+      model-name: ${AI_STREAMING_MODEL_NAME:glm-4.6}
       max-tokens: ${AI_STREAMING_MAX_TOKENS:8192}
+      temperature: ${AI_STREAMING_TEMPERATURE:0.1}
+      timeout: ${AI_MODEL_TIMEOUT:300s}
       log-requests: false
       log-responses: false
     reasoning-streaming-chat-model:
-      base-url: ${AI_REASONING_BASE_URL:${AI_BASE_URL:https://api.deepseek.com}}
-      api-key: ${AI_REASONING_API_KEY:${DEEPSEEK_API_KEY}}
-      model-name: ${VUE_REASONING_MODEL_NAME:deepseek-chat}
-      max-tokens: ${VUE_REASONING_MAX_TOKENS:8192}
+      base-url: ${AI_REASONING_BASE_URL:${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}}
+      api-key: ${AI_REASONING_API_KEY:${AI_API_KEY:${DEEPSEEK_API_KEY}}}
+      model-name: ${VUE_REASONING_MODEL_NAME:${AI_STREAMING_MODEL_NAME:glm-4.6}}
+      max-tokens: ${VUE_REASONING_MAX_TOKENS:32768}
       temperature: ${AI_REASONING_TEMPERATURE:0.1}
+      timeout: ${VUE_REASONING_TIMEOUT:${AI_MODEL_TIMEOUT:300s}}
       log-requests: false
       log-responses: false
     routing-chat-model:
-      base-url: ${ROUTING_AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
-      api-key: ${ROUTING_AI_API_KEY:${DASHSCOPE_API_KEY:${DEEPSEEK_API_KEY}}}
-      model-name: ${ROUTING_AI_MODEL_NAME:qwen-turbo}
+      base-url: ${ROUTING_AI_BASE_URL:${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}}
+      api-key: ${ROUTING_AI_API_KEY:${AI_API_KEY:${DEEPSEEK_API_KEY}}}
+      model-name: ${ROUTING_AI_MODEL_NAME:${AI_CHAT_MODEL_NAME:glm-4.6}}
       max-tokens: ${ROUTING_AI_MAX_TOKENS:100}
       temperature: 0.0
+      timeout: ${ROUTING_AI_TIMEOUT:${AI_MODEL_TIMEOUT:300s}}
+
+ai:
+  chat-memory:
+    max-messages: ${AI_CHAT_MEMORY_MAX_MESSAGES:50}
 
 cos:
   client:

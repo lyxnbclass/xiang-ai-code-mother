@@ -34,36 +34,44 @@ code:
 langchain4j:
   open-ai:
     chat-model:
-      base-url: ${AI_BASE_URL:https://api.deepseek.com}
+      base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}
       api-key: ${AI_API_KEY:}
-      model-name: ${AI_MODEL_NAME:deepseek-chat}
+      model-name: ${AI_MODEL_NAME:glm-4.6}
       max-tokens: ${AI_MAX_TOKENS:8192}
+      timeout: ${AI_MODEL_TIMEOUT:300s}
       log-requests: ${AI_LOG_REQUESTS:false}
       log-responses: ${AI_LOG_RESPONSES:false}
     streaming-chat-model:
-      base-url: ${AI_BASE_URL:https://api.deepseek.com}
+      base-url: ${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}
       api-key: ${AI_API_KEY:}
-      model-name: ${AI_MODEL_NAME:deepseek-chat}
+      model-name: ${AI_MODEL_NAME:glm-4.6}
       max-tokens: ${AI_MAX_TOKENS:8192}
       temperature: ${AI_TEMPERATURE:0.1}
+      timeout: ${AI_MODEL_TIMEOUT:300s}
       log-requests: ${AI_LOG_REQUESTS:false}
       log-responses: ${AI_LOG_RESPONSES:false}
     reasoning-streaming-chat-model:
-      base-url: ${VUE_REASONING_BASE_URL:${AI_BASE_URL:https://api.deepseek.com}}
+      base-url: ${VUE_REASONING_BASE_URL:${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}}
       api-key: ${VUE_REASONING_API_KEY:${AI_API_KEY:}}
-      model-name: ${VUE_REASONING_MODEL_NAME:deepseek-reasoner}
+      model-name: ${VUE_REASONING_MODEL_NAME:${AI_MODEL_NAME:glm-4.6}}
       max-tokens: ${VUE_REASONING_MAX_TOKENS:32768}
       temperature: ${VUE_REASONING_TEMPERATURE:0.1}
+      timeout: ${VUE_REASONING_TIMEOUT:${AI_MODEL_TIMEOUT:300s}}
       log-requests: ${AI_LOG_REQUESTS:false}
       log-responses: ${AI_LOG_RESPONSES:false}
     routing-chat-model:
-      base-url: ${ROUTING_AI_BASE_URL:${AI_BASE_URL:https://api.deepseek.com}}
+      base-url: ${ROUTING_AI_BASE_URL:${AI_BASE_URL:https://open.bigmodel.cn/api/coding/paas/v4}}
       api-key: ${ROUTING_AI_API_KEY:${AI_API_KEY:}}
-      model-name: ${ROUTING_AI_MODEL_NAME:deepseek-chat}
+      model-name: ${ROUTING_AI_MODEL_NAME:${AI_MODEL_NAME:glm-4.6}}
       max-tokens: ${ROUTING_AI_MAX_TOKENS:100}
       temperature: ${ROUTING_AI_TEMPERATURE:0.0}
+      timeout: ${ROUTING_AI_TIMEOUT:${AI_MODEL_TIMEOUT:300s}}
       log-requests: ${AI_LOG_REQUESTS:false}
       log-responses: ${AI_LOG_RESPONSES:false}
+
+ai:
+  chat-memory:
+    max-messages: ${AI_CHAT_MEMORY_MAX_MESSAGES:50}
 
 springdoc:
   group-configs:

@@ -77,6 +77,10 @@ app:
     enabled: ${RATE_LIMIT_ENABLED:true}
     redis-enabled: ${RATE_LIMIT_REDIS_ENABLED:true}
 
+ai:
+  chat-memory:
+    max-messages: ${AI_CHAT_MEMORY_MAX_MESSAGES:50}
+
 # 生成应用的公开访问前缀；生产环境通常设置为 https://your-domain.com/dist。
 code:
   deploy-host: ${APP_DEPLOY_HOST:http://localhost}
